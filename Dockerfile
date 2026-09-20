@@ -2,7 +2,7 @@
 FROM php:8.2-fpm-alpine as base
 
 # Install system dependencies & PHP extensions
-RUN apk add --no-linux-headers --no-cache \
+RUN apk add --no-cache \
     nginx \
     supervisor \
     curl \
@@ -29,9 +29,10 @@ COPY . .
 # Install production dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Set storage & cache permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Ensure sqlite database file exists and set storage, cache, & database permissions
+RUN touch /var/www/html/database/database.sqlite \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 # Nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -39,4 +40,4 @@ COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
 
 # Entrypoint script for production caching & migration
-CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php-fpm -D && nginx -g 'daemon off;'"]
