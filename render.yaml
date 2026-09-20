@@ -6,6 +6,8 @@ services:
     plan: free
     region: singapore
     envVars:
+      - key: APP_KEY
+        value: base64:RHbO8bIasHi1COeWNxTE+0t/moLI+S42hMYZqvYTmEc=
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
