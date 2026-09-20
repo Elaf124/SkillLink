@@ -40,4 +40,4 @@ COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
 
 # Entrypoint script for production caching & migration
-CMD ["sh", "-c", "if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php artisan db:seed --force && php-fpm -D && nginx -g 'daemon off;'"]
