@@ -57,6 +57,21 @@ class ProviderProfileFactory extends Factory
             'bio' => fake()->randomElement($this->bios),
             'professional_title' => $title,
             'experience_years' => fake()->numberBetween(1, 15),
+            'experience' => [
+                [
+                    'role' => $title,
+                    'company' => fake()->company(),
+                    'period' => (date('Y') - 3) . ' - Present',
+                    'description' => 'Delivered top-tier professional services, handling specialized client tasks and quality assurance.'
+                ]
+            ],
+            'education' => [
+                [
+                    'qualification' => 'Professional Certificate / Vocational Diploma',
+                    'institution' => 'Tegbare-Id Polytechnic College',
+                    'year' => (string)(date('Y') - 4)
+                ]
+            ],
             'latitude' => fake()->latitude(8.9, 9.1),
             'longitude' => fake()->longitude(38.6, 38.9),
             'average_rating' => fake()->randomFloat(2, 3.5, 5.0),

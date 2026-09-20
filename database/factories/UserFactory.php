@@ -35,6 +35,7 @@ class UserFactory extends Factory
             'country' => 'Ethiopia',
             'display_currency' => 'ETB',
             'account_status' => 'active',
+            'email_verified_at' => now(),
         ];
     }
 

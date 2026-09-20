@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
@@ -55,6 +57,68 @@ class UserController extends Controller
 
         return response()->json([
             'data' => $user->fresh()->load('role'),
+        ]);
+    }
+
+    /**
+     * Delete the authenticated user's account permanently.
+     * Called by DELETE /api/user.
+     */
+    public function destroy(Request $request)
+    {
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Password is required to confirm account deletion.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        if (! Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'message' => 'The password you entered is incorrect.',
+                'errors'  => ['password' => ['The password you entered is incorrect.']],
+            ], 422);
+        }
+
+        // Safety check 1: Active or unresolved bookings
+        $hasActiveBookings = Booking::where(function ($q) use ($user) {
+            $q->where('customer_id', $user->id);
+            if ($user->providerProfile) {
+                $q->orWhere('provider_id', $user->providerProfile->id);
+            }
+        })
+        ->whereIn('status', ['pending', 'accepted', 'awaiting_confirmation', 'disputed'])
+        ->exists();
+
+        if ($hasActiveBookings) {
+            return response()->json([
+                'message' => 'You cannot delete your account while you have active, accepted, or disputed bookings. Please complete or resolve your commitments first.',
+            ], 422);
+        }
+
+        // Safety check 2: Outstanding provider wallet balance
+        if ($user->providerProfile && $user->providerProfile->wallet) {
+            if ($user->providerProfile->wallet->balance > 0) {
+                return response()->json([
+                    'message' => 'You have an unsettled wallet balance of ETB ' . number_format($user->providerProfile->wallet->balance, 2) . '. Please withdraw your balance before deleting your account.',
+                ], 422);
+            }
+        }
+
+        // Revoke all authentication tokens
+        $user->tokens()->delete();
+
+        // Delete user account (cascades related profiles, services, etc.)
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Your account has been deleted successfully.',
         ]);
     }
 }

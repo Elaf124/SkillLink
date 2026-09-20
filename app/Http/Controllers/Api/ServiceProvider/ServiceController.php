@@ -21,8 +21,11 @@ class ServiceController extends Controller
             $q->where('verification_status', 'verified');
         });
 
-    if ($request->has('category_id')) {
-        $query->where('category_id', $request->category_id);
+    if ($request->filled('category_id')) {
+        $catIds = \App\Models\Category::where('id', $request->category_id)
+            ->orWhere('parent_category_id', $request->category_id)
+            ->pluck('id');
+        $query->whereIn('category_id', $catIds);
     }
 
     $services = $query->paginate(20);

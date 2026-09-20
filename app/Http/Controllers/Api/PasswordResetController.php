@@ -40,37 +40,53 @@ class PasswordResetController extends Controller
         $email = strtolower(trim($request->email));
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
-        if ($user) {
-            $recent = VerificationCode::where('email', $user->email)
-                ->where('type', 'password_reset')
-                ->where('created_at', '>', now()->subSeconds(self::RESEND_COOLDOWN))
-                ->exists();
-
-            if (! $recent) {
-                $code = (string) random_int(100000, 999999);
-
-                VerificationCode::where('email', $user->email)
-                    ->where('type', 'password_reset')
-                    ->delete();
-
-                VerificationCode::create([
-                    'user_id'      => $user->id,
-                    'email'        => $user->email,
-                    'code'         => Hash::make($code),
-                    'type'         => 'password_reset',
-                    'expires_at'   => now()->addMinutes(self::CODE_TTL),
-                    'last_sent_at' => now(),
-                ]);
-
-                try {
-                    Mail::to($user->email)->send(new PasswordResetCodeMail($code, $user->first_name));
-                } catch (\Throwable $e) {
-                    Log::error('Password reset email failed: ' . $e->getMessage());
-                }
-            }
+        if (! $user) {
+            return response()->json([
+                'message' => 'No account found with this email address. Please check the spelling or sign up.',
+            ], 422);
         }
 
-        return response()->json(['message' => self::GENERIC]);
+        $recent = VerificationCode::where('email', $user->email)
+            ->where('type', 'password_reset')
+            ->where('created_at', '>', now()->subSeconds(self::RESEND_COOLDOWN))
+            ->latest('id')
+            ->first();
+
+        if ($recent) {
+            $elapsed = (int) $recent->created_at->diffInSeconds(now(), absolute: true);
+            $wait = max(1, self::RESEND_COOLDOWN - $elapsed);
+            return response()->json([
+                'message'     => "Please wait {$wait}s before requesting another code.",
+                'retry_after' => $wait,
+            ], 429);
+        }
+
+        $code = (string) random_int(100000, 999999);
+
+        VerificationCode::where('email', $user->email)
+            ->where('type', 'password_reset')
+            ->delete();
+
+        VerificationCode::create([
+            'user_id'      => $user->id,
+            'email'        => $user->email,
+            'code'         => Hash::make($code),
+            'type'         => 'password_reset',
+            'expires_at'   => now()->addMinutes(self::CODE_TTL),
+            'last_sent_at' => now(),
+        ]);
+
+        try {
+            Mail::to($user->email)->send(new PasswordResetCodeMail($code, $user->first_name));
+            Log::info("Password reset code emailed to: {$user->email}");
+        } catch (\Throwable $e) {
+            Log::error("Password reset email failed to {$user->email}: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to send reset email (' . $e->getMessage() . '). Please try again later.',
+            ], 500);
+        }
+
+        return response()->json(['message' => 'A reset code has been sent to your email.']);
     }
 
     /**

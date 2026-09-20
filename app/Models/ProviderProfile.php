@@ -15,11 +15,18 @@ class ProviderProfile extends Model
         'bio',
         'professional_title',
         'experience_years',
+        'experience',
+        'education',
         'latitude',
         'longitude',
         'average_rating',
         'completed_jobs',
         'verification_status',
+    ];
+
+    protected $casts = [
+        'experience' => 'array',
+        'education'  => 'array',
     ];
 
 

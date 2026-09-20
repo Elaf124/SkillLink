@@ -31,11 +31,10 @@ use App\Http\Controllers\Api\Admin\FinanceDashboardController;
 use App\Http\Controllers\Api\Admin\SupportDashboardController;
 
 Route::middleware('auth:sanctum')->group(function () {
-    // Existing user get route
+    // User routes
     Route::get('/user', [UserController::class, 'show']);
-
-    // ADD THIS: Profile update PATCH route
     Route::patch('/user', [UserController::class, 'update']);
+    Route::delete('/user', [UserController::class, 'destroy']);
 });
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -53,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/email/verification-code', [EmailVerificationController::class, 'send'])->middleware('throttle:10,1');
 });
 Route::middleware(['auth:sanctum', 'verified.email', 'role:provider'])->group(function () {
+    Route::post('/provider/onboarding', [ProviderProfileController::class, 'onboard']);
     Route::get('/provider/profile', [ProviderProfileController::class, 'show']);
     Route::put('/provider/profile', [ProviderProfileController::class, 'update']);
     Route::post('/provider/profile/portfolio', [ProviderProfileController::class, 'storePortfolio']);
@@ -83,6 +83,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{id}', [CategoryController::class, 'show']);
 Route::get('/skills', [SkillController::class, 'index']);
 // Public route — no auth needed, anyone can browse verified providers
+Route::get('/providers', [ProviderProfileController::class, 'indexPublic']);
 Route::get('/providers/{id}', [ProviderProfileController::class, 'showPublic']);
 // Public
 Route::get('/services', [ServiceController::class, 'index']);
