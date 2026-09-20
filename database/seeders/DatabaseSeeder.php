@@ -14,8 +14,13 @@ class DatabaseSeeder extends Seeder
                 RoleSeeder::class,
                 CategorySeeder::class,
                 SkillSeeder::class,
-                UserSeeder::class,
             ]);
+
+            if (app()->environment('local')) {
+                $this->call([
+                    UserSeeder::class,
+                ]);
+            }
         }
     }
 }
