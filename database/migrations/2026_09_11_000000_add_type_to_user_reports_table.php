@@ -31,7 +31,9 @@ return new class extends Migration
 
         // Reuse the existing status enum but add 'resolved' for technical inquiries
         // (user reports keep using pending/reviewed/dismissed as before).
-        DB::statement("ALTER TABLE user_reports MODIFY status ENUM('pending','reviewed','dismissed','resolved') NOT NULL DEFAULT 'pending'");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE user_reports MODIFY status ENUM('pending','reviewed','dismissed','resolved') NOT NULL DEFAULT 'pending'");
+        }
     }
 
     public function down(): void
@@ -46,6 +48,8 @@ return new class extends Migration
             $table->foreign('reported_user_id')->references('id')->on('users')->cascadeOnDelete();
         });
 
-        DB::statement("ALTER TABLE user_reports MODIFY status ENUM('pending','reviewed','dismissed') NOT NULL DEFAULT 'pending'");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE user_reports MODIFY status ENUM('pending','reviewed','dismissed') NOT NULL DEFAULT 'pending'");
+        }
     }
 };
