@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -55,10 +56,25 @@ class UserController extends Controller
             ], 422);
         }
 
-        $user->update($validator->validated());
+        $data = $validator->validated();
+
+        if (! empty($data['profile_photo']) && str_starts_with($data['profile_photo'], 'data:image/')) {
+            $savedUrl = $this->storeBase64Photo($data['profile_photo'], $user->profile_photo);
+            if ($savedUrl) {
+                $data['profile_photo'] = $savedUrl;
+            } else {
+                unset($data['profile_photo']);
+            }
+        }
+
+        $user->update($data);
+
+        $freshUser = $user->fresh()->load(['role', 'providerProfile']);
 
         return response()->json([
-            'data' => $user->fresh()->load('role'),
+            'message' => 'Profile updated successfully.',
+            'data'    => $freshUser,
+            'user'    => $freshUser,
         ]);
     }
 
@@ -130,29 +146,43 @@ class UserController extends Controller
      */
     public function uploadPhoto(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'photo' => 'required|image|max:5120', // Max 5MB
-        ]);
+        $user = $request->user();
+        $photoUrl = null;
 
-        if ($validator->fails()) {
+        if ($request->hasFile('photo')) {
+            $validator = Validator::make($request->all(), [
+                'photo' => 'required|file|mimes:jpeg,jpg,png,webp,gif|max:10240', // Max 10MB
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed: ' . implode(' ', $validator->errors()->all()),
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            // Remove old profile photo file from public storage if it was stored locally
+            if ($user->profile_photo && str_contains($user->profile_photo, '/storage/avatars/')) {
+                $oldPath = 'avatars/' . basename($user->profile_photo);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+
+            $path = $request->file('photo')->store('avatars', 'public');
+            $photoUrl = Storage::url($path);
+        } elseif ($request->filled('photo') || $request->filled('photo_base64') || $request->filled('image')) {
+            $base64Data = $request->input('photo') ?? $request->input('photo_base64') ?? $request->input('image');
+            $photoUrl = $this->storeBase64Photo($base64Data, $user->profile_photo);
+            if (! $photoUrl) {
+                return response()->json(['message' => 'Invalid image format or data.'], 422);
+            }
+        } else {
             return response()->json([
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
+                'message' => 'No image provided. Please select an image file to upload.',
+                'errors'  => ['photo' => ['No image provided.']],
             ], 422);
         }
-
-        $user = $request->user();
-
-        // Remove old profile photo file from public storage if it was stored locally
-        if ($user->profile_photo && str_contains($user->profile_photo, '/storage/avatars/')) {
-            $oldPath = 'avatars/' . basename($user->profile_photo);
-            if (Storage::disk('public')->exists($oldPath)) {
-                Storage::disk('public')->delete($oldPath);
-            }
-        }
-
-        $path = $request->file('photo')->store('avatars', 'public');
-        $photoUrl = Storage::url($path);
 
         $user->update([
             'profile_photo' => $photoUrl,
@@ -163,6 +193,39 @@ class UserController extends Controller
             'profile_photo' => $photoUrl,
             'user'          => $user->fresh()->load(['role', 'providerProfile']),
         ]);
+    }
+
+    /**
+     * Store a base64 encoded image string to public avatar storage.
+     */
+    protected function storeBase64Photo(string $base64Data, ?string $oldPhotoUrl = null): ?string
+    {
+        $ext = 'jpg';
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
+            $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $ext = strtolower($matches[1]);
+            if ($ext === 'jpeg') {
+                $ext = 'jpg';
+            }
+        }
+
+        $decoded = base64_decode($base64Data, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        // Clean up old avatar if exists
+        if ($oldPhotoUrl && str_contains($oldPhotoUrl, '/storage/avatars/')) {
+            $oldPath = 'avatars/' . basename($oldPhotoUrl);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        $filename = 'avatars/' . Str::random(40) . '.' . $ext;
+        Storage::disk('public')->put($filename, $decoded);
+
+        return Storage::url($filename);
     }
 
     /**
