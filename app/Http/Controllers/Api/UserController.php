@@ -45,6 +45,7 @@ class UserController extends Controller
             'languages'       => 'sometimes|nullable|array',
             'company_name'    => 'sometimes|nullable|string|max:255',
             'company_website' => 'sometimes|nullable|string|max:255',
+            'profile_photo'   => 'sometimes|nullable|string',
         ]);
 
         if ($validator->fails()) {
