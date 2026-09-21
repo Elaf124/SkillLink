@@ -33,6 +33,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN touch /var/www/html/database/database.sqlite \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
+    && mkdir -p /tmp/nginx_client_body /var/lib/nginx/body /var/lib/nginx/tmp /var/log/nginx \
+    && chown -R www-data:www-data /tmp/nginx_client_body /var/lib/nginx /var/log/nginx \
+    && chmod -R 777 /tmp/nginx_client_body \
     && php artisan storage:link || true
 
 # Nginx configuration
@@ -41,4 +44,4 @@ COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
 
 # Entrypoint script for production caching & migration
-CMD ["sh", "-c", "if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi && php artisan storage:link || true && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php artisan db:seed --force && php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "mkdir -p /tmp/nginx_client_body && chmod 777 /tmp/nginx_client_body && if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi && php artisan storage:link || true && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && php artisan db:seed --force && php-fpm -D && nginx -g 'daemon off;'"]
