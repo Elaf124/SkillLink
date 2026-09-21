@@ -151,18 +151,29 @@ class ProviderProfileController extends Controller
         }
 
         if ($request->filled('q')) {
-            $search = strtolower($request->q);
-            $query->where(function ($q) use ($search) {
-                $q->where('professional_title', 'like', "%{$search}%")
-                  ->orWhere('bio', 'like', "%{$search}%")
-                  ->orWhereHas('user', function ($uq) use ($search) {
-                      $uq->where('first_name', 'like', "%{$search}%")
-                         ->orWhere('last_name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('services', function ($sq) use ($search) {
-                      $sq->where('title', 'like', "%{$search}%");
-                  });
-            });
+            $rawSearch = trim($request->q);
+            $tokens = array_filter(explode(' ', strtolower($rawSearch)));
+
+            foreach ($tokens as $token) {
+                $query->where(function ($q) use ($token) {
+                    $q->where('professional_title', 'like', "%{$token}%")
+                      ->orWhere('bio', 'like', "%{$token}%")
+                      ->orWhere('business_name', 'like', "%{$token}%")
+                      ->orWhereHas('user', function ($uq) use ($token) {
+                          $uq->where('first_name', 'like', "%{$token}%")
+                             ->orWhere('last_name', 'like', "%{$token}%")
+                             ->orWhere('city', 'like', "%{$token}%")
+                             ->orWhere('area', 'like', "%{$token}%");
+                      })
+                      ->orWhereHas('services', function ($sq) use ($token) {
+                          $sq->where('title', 'like', "%{$token}%")
+                             ->orWhere('description', 'like', "%{$token}%");
+                      })
+                      ->orWhereHas('skills', function ($skq) use ($token) {
+                          $skq->where('skill_name', 'like', "%{$token}%");
+                      });
+                });
+            }
         }
 
         $providers = $query->paginate(24);
