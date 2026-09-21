@@ -7,6 +7,7 @@ use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -119,6 +120,72 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Your account has been deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Upload or update the authenticated user's profile photo.
+     * Called by POST /api/user/photo.
+     */
+    public function uploadPhoto(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'photo' => 'required|image|max:5120', // Max 5MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+
+        // Remove old profile photo file from public storage if it was stored locally
+        if ($user->profile_photo && str_contains($user->profile_photo, '/storage/avatars/')) {
+            $oldPath = 'avatars/' . basename($user->profile_photo);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        $path = $request->file('photo')->store('avatars', 'public');
+        $photoUrl = Storage::url($path);
+
+        $user->update([
+            'profile_photo' => $photoUrl,
+        ]);
+
+        return response()->json([
+            'message'       => 'Profile photo updated successfully.',
+            'profile_photo' => $photoUrl,
+            'user'          => $user->fresh()->load(['role', 'providerProfile']),
+        ]);
+    }
+
+    /**
+     * Remove the authenticated user's profile photo.
+     * Called by DELETE /api/user/photo.
+     */
+    public function deletePhoto(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->profile_photo && str_contains($user->profile_photo, '/storage/avatars/')) {
+            $oldPath = 'avatars/' . basename($user->profile_photo);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        $user->update([
+            'profile_photo' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'Profile photo removed successfully.',
+            'user'    => $user->fresh()->load(['role', 'providerProfile']),
         ]);
     }
 }

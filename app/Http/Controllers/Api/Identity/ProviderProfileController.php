@@ -89,6 +89,13 @@ class ProviderProfileController extends Controller
             $profile->availability()->createMany($data['availability']);
         }
 
+        if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('avatars', 'public');
+            $request->user()->update(['profile_photo' => Storage::url($path)]);
+        } elseif ($request->filled('profile_photo')) {
+            $request->user()->update(['profile_photo' => $request->input('profile_photo')]);
+        }
+
         return response()->json([
             'message' => 'Provider profile updated successfully',
             'data'    => $profile->fresh(['user', 'services', 'skills', 'portfolio', 'availability', 'verifications']),

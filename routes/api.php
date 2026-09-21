@@ -35,6 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [UserController::class, 'show']);
     Route::patch('/user', [UserController::class, 'update']);
     Route::delete('/user', [UserController::class, 'destroy']);
+    Route::post('/user/photo', [UserController::class, 'uploadPhoto']);
+    Route::delete('/user/photo', [UserController::class, 'deletePhoto']);
 });
 
 Route::post('/register', [AuthController::class, 'register']);
